@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -23,6 +24,23 @@ const std::vector<const char*> validationLayers = {
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
+
+//helper function to read our shader(spv) files
+static std::vector<char> readFile(const std::string& filename) {
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file!");
+	}
+
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+	return buffer;
+}
 
 //Struct for Queue families
 struct QueueFamilyIndices {
@@ -111,6 +129,7 @@ private:
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
+		createGraphicsPipeline();
 	}
 
 	void createInstance() {
@@ -553,6 +572,55 @@ private:
 			requiredExtensions.erase(extension.extensionName);
 		}
 		return requiredExtensions.empty();
+	}
+
+	//The Graphics Pipeline
+	void createGraphicsPipeline() {
+		auto vertShaderCode = readFile("vert.spv");
+		auto fragShaderCode = readFile("frag.spv");
+
+		if (vertShaderCode.empty()) {
+			std::cout << "empty vertexshader"<< std::endl;
+		}
+
+		VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+		VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+		//creating shader pipeline
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertShaderStageInfo.module = vertShaderModule;
+		vertShaderStageInfo.pName = "main"; // try defining a differnet function for the vertex shader and call it the entrypoint : pName is the entrypoint.
+
+		VkPipelineShaderStageCreateInfo fragshaderderStageInfo{};
+		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		vertShaderStageInfo.module = fragShaderModule;
+		vertShaderStageInfo.pName = "main"; // try defining a differnet function for the fragment shader and call it the entrypoint : pName is the entrypoint.
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragshaderderStageInfo };
+
+
+
+
+		vkDestroyShaderModule(device, vertShaderModule, nullptr);
+		vkDestroyShaderModule(device, fragShaderModule, nullptr);
+
+	}
+
+	VkShaderModule createShaderModule(const std::vector<char>& code) {
+		VkShaderModuleCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = code.size();
+		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+		VkShaderModule shaderModule;
+		if(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create shader module");
+		}
+
+		return shaderModule;
 	}
 
 	// to return list of extensions based on whether validation layers are enabled or not :: will be using for debug purposes.
